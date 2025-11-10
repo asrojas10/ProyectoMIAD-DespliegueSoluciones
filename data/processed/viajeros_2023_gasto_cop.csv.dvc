@@ -1,0 +1,5 @@
+outs:
+- md5: 87b5489d21cfe41f2d0901402c2c0385
+  size: 1827066
+  hash: md5
+  path: viajeros_2023_gasto_cop.csv
