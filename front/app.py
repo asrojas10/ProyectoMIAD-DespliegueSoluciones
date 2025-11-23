@@ -188,7 +188,7 @@ def realizar_prediccion(n_clicks, duracion, motivo, alojamiento):
                 children=[
                     dmc.Group(position="apart", children=[
                         dmc.Text("Cálculo procesado vía API:"),
-                        dmc.Badge("API OK", color="lime")
+                        dmc.Badge("Estimación Exitosa", color="lime")
                     ]),
                     dmc.Space(h=10),
                     dmc.Text(f"${valor:,.0f} COP", size="xl", weight=700)
