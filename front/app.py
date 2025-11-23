@@ -12,6 +12,7 @@ server = app.server
 # URL de la API (Variable de entorno)
 # En local busca en localhost:8000, en la nube usará la variable que configures en Railway
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+print(f"🚨 DEBUG: La URL que estoy viendo es: '{API_URL}'")
 
 # Función auxiliar para íconos
 def get_icon(icon):
