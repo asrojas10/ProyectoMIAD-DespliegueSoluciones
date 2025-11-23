@@ -3,23 +3,68 @@ import dash_mantine_components as dmc
 from dash import dcc, html, Input, Output, State
 from dash_iconify import DashIconify
 import requests
+import pandas as pd
+import plotly.express as px
 import os
 
 # 1. CONFIGURACIÓN
 app = dash.Dash(__name__)
 server = app.server
-
-# URL de la API (Variable de entorno)
-# En local busca en localhost:8000, en la nube usará la variable que configures en Railway
 API_URL = os.getenv("API_URL", "http://localhost:8000")
-print(f"🚨 DEBUG: La URL que estoy viendo es: '{API_URL}'")
 
-# Función auxiliar para íconos
+# --- CARGA DE DATOS HISTÓRICOS ---
+try:
+    df = pd.read_csv('datos_historicos.csv')
+    
+    # KPIs
+    total_viajeros = len(df)
+    gasto_promedio = df['gasto_total_pesos'].mean()
+    estancia_promedio = df['duracion_estadia'].mean()
+    gasto_total_anio = df['gasto_total_pesos'].sum() # Suma total de la muestra
+    
+    # Gráfica 1: Motivos
+    top_motivos = df['motivo'].value_counts().head(5)
+    fig_motivos = px.bar(x=top_motivos.values, y=top_motivos.index, orientation='h', 
+                         title="Top 5 Motivos de Viaje", template="plotly_white",
+                         labels={'x': 'Viajeros', 'y': ''})
+    fig_motivos.update_layout(margin=dict(l=0, r=0, t=40, b=0), height=300)
+    fig_motivos.update_traces(marker_color='#339af0')
+
+    # Gráfica 2: Alojamiento (NUEVA)
+    top_alojamiento = df['alojamiento'].value_counts().head(5)
+    fig_alojamiento = px.bar(x=top_alojamiento.values, y=top_alojamiento.index, orientation='h',
+                             title="Preferencias de Alojamiento", template="plotly_white",
+                             labels={'x': 'Viajeros', 'y': ''})
+    fig_alojamiento.update_layout(margin=dict(l=0, r=0, t=40, b=0), height=300)
+    fig_alojamiento.update_traces(marker_color='#40c057')
+
+except Exception as e:
+    print(f"⚠️ Error cargando históricos: {e}")
+    total_viajeros = 0
+    gasto_promedio = 0
+    estancia_promedio = 0
+    gasto_total_anio = 0
+    fig_motivos = {}
+    fig_alojamiento = {}
+
+# Helper para Tarjetas KPI
+def crear_kpi(titulo, valor, icono, color):
+    return dmc.Paper(
+        shadow="md", radius="md", p="md", withBorder=True,
+        children=[
+            dmc.Group(position="apart", children=[
+                dmc.Text(titulo, color="dimmed", size="xs", weight=700, transform="uppercase"),
+                dmc.ThemeIcon(DashIconify(icon=icono, width=20), color=color, variant="light", size="lg")
+            ]),
+            dmc.Text(valor, size="xl", weight=700, style={"marginTop": 10})
+        ]
+    )
+
 def get_icon(icon):
     return DashIconify(icon=icon, height=20)
 
 # ---------------------------------------------------------
-# 2. LAYOUT (DISEÑO VISUAL)
+# 2. LAYOUT VISUAL
 # ---------------------------------------------------------
 app.layout = dmc.MantineProvider(
     id="mantine-provider",
@@ -27,134 +72,109 @@ app.layout = dmc.MantineProvider(
     withGlobalStyles=True,
     withNormalizeCSS=True,
     children=[
-        dmc.Container(size="sm", style={"marginTop": 40}, children=[
+        dmc.Container(size="xl", style={"marginTop": 30, "marginBottom": 50}, children=[
             
             # Encabezado
-            dmc.Group(position="center", spacing="xs", children=[
-                DashIconify(icon="emojione:airplane", height=40),
-                dmc.Title("Predictor de Gasto Turístico", order=2, color="blue"),
+            dmc.Group(spacing="xs", children=[
+                DashIconify(icon="emojione:airplane", height=35),
+                dmc.Title("Inteligencia Turística Bogotá", order=2, color="blue"),
             ]),
-            dmc.Text("Inteligencia Artificial para el Turismo en Bogotá", color="dimmed", align="center", size="sm"),
+            dmc.Text("Análisis descriptivo 2023 y Proyecciones IA", color="dimmed"),
+            dmc.Divider(my="md"),
+
+            # --- SECCIÓN 1: KPIs (4 Tarjetas) ---
+            dmc.SimpleGrid(cols=4, spacing="lg", breakpoints=[{"maxWidth": "sm", "cols": 1}], children=[
+                crear_kpi("Viajeros Analizados", f"{total_viajeros:,.0f}", "mdi:account-group", "blue"),
+                crear_kpi("Gasto Promedio / Pers", f"${gasto_promedio:,.0f}", "mdi:cash-multiple", "green"),
+                crear_kpi("Estancia Promedio", f"{estancia_promedio:.1f} Días", "mdi:calendar-clock", "orange"),
+                crear_kpi("Impacto Económico (Muestra)", f"${gasto_total_anio:,.0f}", "mdi:bank", "grape"),
+            ]),
             
             dmc.Space(h=30),
 
-            # Tarjeta Principal
-            dmc.Paper(shadow="xl", radius="lg", p="xl", withBorder=True, children=[
-                
-                # Grid de Inputs
-                dmc.Grid(children=[
-                    
-                    # 1. Duración
-                    dmc.Col(span=12, children=[
-                        dmc.NumberInput(
-                            id="input-duracion",
-                            label="Duración del Viaje",
-                            description="¿Cuántas noches se quedará?",
-                            value=3,
-                            min=1,
-                            icon=get_icon("radix-icons:calendar"),
-                            style={"width": "100%"}
-                        ),
-                    ]),
+            # --- SECCIÓN 2: GRÁFICAS ---
+            dmc.Grid(children=[
+                dmc.Col(span=12, md=6, children=[
+                    dmc.Paper(shadow="sm", p="md", withBorder=True, children=[dcc.Graph(figure=fig_motivos)])
+                ]),
+                dmc.Col(span=12, md=6, children=[
+                    dmc.Paper(shadow="sm", p="md", withBorder=True, children=[dcc.Graph(figure=fig_alojamiento)])
+                ]),
+            ]),
 
-                    # 2. Motivo
-                    dmc.Col(span=12, children=[
+            dmc.Space(h=50),
+            dmc.Divider(label="PREDICTOR EN TIEMPO REAL", labelPosition="center", size="sm"),
+            dmc.Space(h=20),
+
+            # --- SECCIÓN 3: CALCULADORA IA ---
+            dmc.Paper(shadow="xl", radius="lg", p="xl", withBorder=True, style={"borderColor": "#228be6"}, children=[
+                dmc.Text("Simulador de Gasto Futuro", size="lg", weight=600, mb="lg", align="center"),
+                
+                dmc.Grid(children=[
+                    dmc.Col(span=12, md=4, children=[
+                        dmc.NumberInput(
+                            id="input-duracion", label="Duración (Noches)", value=3, min=1,
+                            icon=get_icon("radix-icons:calendar"), style={"width": "100%"}
+                        )
+                    ]),
+                    dmc.Col(span=12, md=4, children=[
                         dmc.Select(
-                            id="input-motivo",
-                            label="Motivo Principal",
-                            description="Seleccione la razón del viaje",
-                            value='a. Vacaciones/recreación/Ocio',
+                            id="input-motivo", label="Motivo", value='a. Vacaciones/recreación/Ocio',
                             icon=get_icon("radix-icons:person"),
                             data=[
-                                {'label': '🏖️ Vacaciones / Ocio', 'value': 'a. Vacaciones/recreación/Ocio'},
+                                {'label': '🏖️ Vacaciones', 'value': 'a. Vacaciones/recreación/Ocio'},
                                 {'label': '💼 Negocios', 'value': 'g. Negocios y motivos profesionales'},
-                                {'label': '🏠 Visita Familiares', 'value': 'b. Visita a familiares y amigos'},
+                                {'label': '🏠 Familia', 'value': 'b. Visita a familiares y amigos'},
                                 {'label': '🎓 Educación', 'value': 'c. Educación y formación'},
                                 {'label': '🏥 Salud', 'value': 'd. Salud , Bienestar y atención médica'},
                                 {'label': '🛍️ Compras', 'value': 'f. Compras'},
-                                {'label': '⛪ Religión', 'value': 'e. Religión/Peregrinaciones'},
-                                {'label': '🏭 Trabajo (Otra ciudad)', 'value': 'h. Trabajo remunerado en otra ciudad'},
-                                {'label': '❓ Otro', 'value': 'i. Otro.'}
-                            ],
-                            style={"width": "100%"}
-                        ),
+                                {'label': 'i. Otro', 'value': 'i. Otro.'}
+                            ], style={"width": "100%"}
+                        )
                     ]),
-
-                    # 3. Alojamiento
-                    dmc.Col(span=12, children=[
+                    dmc.Col(span=12, md=4, children=[
                         dmc.Select(
-                            id="input-alojamiento",
-                            label="Tipo de Alojamiento",
-                            description="¿Dónde se hospedará?",
-                            value='a. Hotel',
+                            id="input-alojamiento", label="Alojamiento", value='a. Hotel',
                             icon=get_icon("radix-icons:home"),
                             data=[
                                 {'label': '🏨 Hotel', 'value': 'a. Hotel'},
                                 {'label': '🎒 Hostal', 'value': 'b. Hostal'},
                                 {'label': '🏢 Apartahotel', 'value': 'c. Apartahotel'},
-                                {'label': '📱 Airbnb / Plataforma', 'value': 'd. Inmueble de alquiler (pagos por plataforma dig)'},
-                                {'label': '🏠 Casa Amigos/Familia', 'value': 'e. Casa propia, de familiares o amigos (sin pago)'},
-                                {'label': '⛺ Otro', 'value': 'f. Otro'}
-                            ],
-                            style={"width": "100%"}
-                        ),
+                                {'label': '📱 Airbnb', 'value': 'd. Inmueble de alquiler (pagos por plataforma dig)'},
+                                {'label': '🏠 Casa Amigos', 'value': 'e. Casa propia, de familiares o amigos (sin pago)'},
+                                {'label': 'f. Otro', 'value': 'f. Otro'}
+                            ], style={"width": "100%"}
+                        )
                     ]),
                 ]),
-
-                dmc.Space(h=20),
                 
-                # Botón de Acción
+                dmc.Space(h=30),
                 dmc.Button(
-                    "Calcular Predicción",
-                    id="btn-predecir",
-                    variant="gradient",
-                    gradient={"from": "teal", "to": "blue", "deg": 60},
-                    fullWidth=True,
-                    size="lg",
-                    leftIcon=DashIconify(icon="fluent:calculator-20-regular")
+                    "Calcular Predicción con IA", id="btn-predecir", 
+                    variant="gradient", gradient={"from": "indigo", "to": "cyan"}, 
+                    fullWidth=True, size="lg"
                 ),
-
-                dmc.Divider(label="Resultado", labelPosition="center", my="lg"),
-
-                # Área de Resultado
-                dmc.LoadingOverlay(
-                    html.Div(id="resultado-container", children=[
-                        dmc.Alert(
-                            title="Esperando datos...",
-                            color="gray",
-                            children="Configure los parámetros y presione calcular."
-                        )
-                    ])
-                )
+                
+                dmc.Space(h=20),
+                dmc.LoadingOverlay(html.Div(id="resultado-container"))
             ]),
-            
-            # Switch Modo Oscuro
-            dmc.Space(h=20),
+
+            # Switch Dark Mode
+            dmc.Space(h=30),
             dmc.Group(position="right", children=[
-                dmc.Switch(
-                    id="theme-switch",
-                    size="lg",
-                    onLabel=DashIconify(icon="radix-icons:moon", width=16),
-                    offLabel=DashIconify(icon="radix-icons:sun", width=16),
-                )
+                dmc.Switch(id="theme-switch", size="lg", onLabel=DashIconify(icon="radix-icons:moon"), offLabel=DashIconify(icon="radix-icons:sun"))
             ])
         ])
     ]
 )
 
 # ---------------------------------------------------------
-# 3. LÓGICA (CALLBACKS)
+# 3. CALLBACKS
 # ---------------------------------------------------------
-
-# Callback para cambiar tema (Light/Dark)
-@app.callback(
-    Output("mantine-provider", "theme"),
-    Input("theme-switch", "checked"),
-)
+@app.callback(Output("mantine-provider", "theme"), Input("theme-switch", "checked"))
 def update_theme(checked):
     return {"colorScheme": "dark" if checked else "light"}
 
-# Callback Principal: Envía datos a la API y muestra respuesta
 @app.callback(
     Output('resultado-container', 'children'),
     Input('btn-predecir', 'n_clicks'),
@@ -164,53 +184,27 @@ def update_theme(checked):
     prevent_initial_call=True
 )
 def realizar_prediccion(n_clicks, duracion, motivo, alojamiento):
-    # Crear el paquete de datos (JSON)
-    payload = {
-        "duracion": int(duracion),
-        "motivo": motivo,
-        "alojamiento": alojamiento
-    }
-    
+    payload = {"duracion": int(duracion), "motivo": motivo, "alojamiento": alojamiento}
     try:
-        # LLAMADA A LA API (Microservicio)
-        # Usamos f-string para insertar la URL configurada
         response = requests.post(f"{API_URL}/predict", json=payload)
-        
         if response.status_code == 200:
-            data = response.json()
-            valor = data["gasto_estimado"]
-            
-            # Alerta de Éxito
+            valor = response.json()["gasto_estimado"]
             return dmc.Alert(
-                title="Estimación Exitosa",
-                color="green",
-                variant="filled",
+                title="Estimación Exitosa", color="green", variant="filled",
                 children=[
                     dmc.Group(position="apart", children=[
-                        dmc.Text("Cálculo procesado vía API:"),
-                        dmc.Badge("Estimación Exitosa", color="lime")
+                        dmc.Text("Cálculo procesado vía API Remota:"),
+                        dmc.Badge("Status 200 OK", color="lime")
                     ]),
                     dmc.Space(h=10),
                     dmc.Text(f"${valor:,.0f} COP", size="xl", weight=700)
                 ],
-                icon=DashIconify(icon="game-icons:cash", height=30)
+                icon=DashIconify(icon="mdi:check-circle", height=30)
             )
         else:
-            # Alerta de Error de la API (ej. 500)
-            return dmc.Alert(
-                title="Error en el Modelo", 
-                color="red", 
-                children=f"La API respondió con error {response.status_code}: {response.text}"
-            )
-            
+            return dmc.Alert(title="Error API", color="red", children=f"La API respondió: {response.text}")
     except Exception as e:
-        # Alerta de Error de Conexión (ej. API apagada)
-        return dmc.Alert(
-            title="Error de Conexión", 
-            color="red", 
-            children=f"No se pudo conectar al servicio en {API_URL}. Detalles: {str(e)}"
-        )
+        return dmc.Alert(title="Error Conexión", color="red", children=f"No se pudo conectar a {API_URL}. Detalle: {e}")
 
-# Arranque del servidor
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=8050)
