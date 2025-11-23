@@ -87,7 +87,7 @@ app.layout = dmc.MantineProvider(
                 crear_kpi("Viajeros Analizados", f"{total_viajeros:,.0f}", "mdi:account-group", "blue"),
                 crear_kpi("Gasto Promedio / Pers", f"${gasto_promedio:,.0f}", "mdi:cash-multiple", "green"),
                 crear_kpi("Estancia Promedio", f"{estancia_promedio:.1f} Días", "mdi:calendar-clock", "orange"),
-                crear_kpi("Impacto Económico (Muestra)", f"${gasto_total_anio:,.0f}", "mdi:bank", "grape"),
+                crear_kpi("Impacto Económico", f"${gasto_total_anio:,.0f}", "mdi:bank", "grape"),
             ]),
             
             dmc.Space(h=30),
@@ -194,7 +194,7 @@ def realizar_prediccion(n_clicks, duracion, motivo, alojamiento):
                 children=[
                     dmc.Group(position="apart", children=[
                         dmc.Text("Cálculo procesado vía API Remota:"),
-                        dmc.Badge("Status 200 OK", color="lime")
+                        dmc.Badge("Estimación Exitosa", color="lime")
                     ]),
                     dmc.Space(h=10),
                     dmc.Text(f"${valor:,.0f} COP", size="xl", weight=700)
